@@ -1,0 +1,6 @@
+node_modules/
+dist/
+.env
+*.log
+backend/baizona-server
+.DS_Store
