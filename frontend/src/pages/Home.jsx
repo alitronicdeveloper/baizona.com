@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { getTodayStats, getAllProducts, getAllSalesWithFetch } from '../db/operations'
+import { db } from '../db/dexie'
 
 function Home() {
   const [today, setToday] = useState({ total_sales: 0, total_profit: 0, total_count: 0 })
@@ -17,7 +18,26 @@ function Home() {
     setLowStock(products.filter(p => Number(p.stock) <= Number(p.reorder_level)).slice(0, 3))
 
     const sales = await getAllSalesWithFetch()
-    setRecentSales(sales.slice(0, 3))
+    const top3 = sales.slice(0, 3)
+
+    // Pata jina la bidhaa kwa kila mauzo
+    for (const s of top3) {
+      try {
+        const items = await db.sale_items.where('sale_id').equals(s.local_id).toArray()
+        if (items.length > 0) {
+          s.first_item_name = items[0].product_name || 'Bidhaa'
+          s.items_count = items.length
+        } else {
+          s.first_item_name = 'Mauzo'
+          s.items_count = 0
+        }
+      } catch (e) {
+        s.first_item_name = 'Mauzo'
+        s.items_count = 0
+      }
+    }
+
+    setRecentSales(top3)
   }
 
   useEffect(() => {

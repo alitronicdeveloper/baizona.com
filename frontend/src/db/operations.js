@@ -570,3 +570,222 @@ export async function getCustomerDepositBalance(customerLocalId) {
   const customer = await db.customers.get(customerLocalId)
   return Number(customer?.deposit || 0)
 }
+
+// =====================================================
+// SUPPLIERS (Wasambazaji)
+// =====================================================
+
+export async function getAllSuppliers() {
+  return await db.suppliers.orderBy('name').toArray()
+}
+
+export async function getSupplierById(localId) {
+  return await db.suppliers.get(localId)
+}
+
+export async function createSupplierLocal(data) {
+  const existing = await db.suppliers
+    .filter(s => s.name.toLowerCase() === data.name.toLowerCase())
+    .first()
+
+  if (existing) {
+    return existing
+  }
+
+  const local_id = generateLocalId()
+
+  await db.suppliers.add({
+    local_id,
+    remote_id: null,
+    name: data.name,
+    phone: data.phone || '',
+    address: data.address || '',
+    notes: data.notes || '',
+    balance: 0,
+    synced_at: null,
+    created_at: new Date().toISOString(),
+  })
+
+  if (isOnline()) {
+    try {
+      await syncAll()
+    } catch (e) {
+      console.log('Sync failed:', e.message)
+    }
+  }
+
+  return await db.suppliers.get(local_id)
+}
+
+export async function updateSupplierLocal(localId, data) {
+  await db.suppliers.update(localId, {
+    ...data,
+    synced_at: null,
+  })
+}
+
+// =====================================================
+// PURCHASES (Manunuzi)
+// =====================================================
+
+export async function getAllPurchases() {
+  return await db.purchases.orderBy('purchase_date').reverse().toArray()
+}
+
+export async function getPurchasesBySupplier(supplierLocalId) {
+  return await db.purchases
+    .where('supplier_local_id').equals(supplierLocalId)
+    .reverse()
+    .sortBy('purchase_date')
+}
+
+export async function createPurchaseLocal(data) {
+  // data: { supplier_local_id, items: [{product_local_id, quantity, cost_price}], amount_paid, notes }
+
+  const purchaseLocalId = generateLocalId()
+  let totalAmount = 0
+
+  // 1. Unda purchase
+  await db.purchases.add({
+    local_id: purchaseLocalId,
+    remote_id: null,
+    supplier_local_id: data.supplier_local_id,
+    total_amount: 0, // itaongezwa baadaye
+    amount_paid: Number(data.amount_paid || 0),
+    balance: 0,
+    notes: data.notes || '',
+    purchase_date: new Date().toISOString(),
+    synced_at: null,
+    created_at: new Date().toISOString(),
+  })
+
+  // 2. Unda purchase items + ongeza stock
+  for (const item of data.items) {
+    const subtotal = Number(item.cost_price) * Number(item.quantity)
+    totalAmount += subtotal
+
+    await db.purchase_items.add({
+      local_id: generateLocalId(),
+      remote_id: null,
+      purchase_id: purchaseLocalId,
+      product_local_id: item.product_local_id,
+      product_name: item.product_name || '',
+      quantity: Number(item.quantity),
+      cost_price: Number(item.cost_price),
+      subtotal: subtotal,
+      synced_at: null,
+    })
+
+    // Ongeza stock
+    const product = await db.products.get(item.product_local_id)
+    if (product) {
+      await db.products.update(item.product_local_id, {
+        stock: Number(product.stock) + Number(item.quantity),
+        cost_price: Number(item.cost_price), // sasisha bei ya kununua
+      })
+
+      // Rekodi stock movement
+      await db.stock_movements.add({
+        local_id: generateLocalId(),
+        remote_id: null,
+        product_local_id: item.product_local_id,
+        product_name: product.name,
+        movement_type: 'in',
+        quantity: Number(item.quantity),
+        reference_type: 'purchase',
+        reference_id: purchaseLocalId,
+        notes: `Manunuzi kutoka supplier`,
+        created_at: new Date().toISOString(),
+        synced_at: null,
+      })
+    }
+  }
+
+  // 3. Sasisha purchase na totals
+  const balance = totalAmount - Number(data.amount_paid || 0)
+
+  await db.purchases.update(purchaseLocalId, {
+    total_amount: totalAmount,
+    balance: balance,
+  })
+
+  // 4. Sasisha deni la supplier
+  if (data.supplier_local_id) {
+    const supplier = await db.suppliers.get(data.supplier_local_id)
+    if (supplier) {
+      await db.suppliers.update(data.supplier_local_id, {
+        balance: Number(supplier.balance || 0) + balance,
+      })
+    }
+  }
+
+  if (isOnline()) {
+    try {
+      await syncAll()
+    } catch (e) {
+      console.log('Sync failed:', e.message)
+    }
+  }
+
+  return await db.purchases.get(purchaseLocalId)
+}
+
+// =====================================================
+// SUPPLIER PAYMENTS (Malipo kwa Supplier)
+// =====================================================
+
+export async function createSupplierPaymentLocal(data) {
+  // data: { supplier_local_id, amount, payment_method, notes }
+
+  const local_id = generateLocalId()
+
+  await db.supplier_payments.add({
+    local_id,
+    remote_id: null,
+    supplier_local_id: data.supplier_local_id,
+    amount: Number(data.amount),
+    payment_method: data.payment_method || 'cash',
+    notes: data.notes || '',
+    payment_date: new Date().toISOString(),
+    synced_at: null,
+    created_at: new Date().toISOString(),
+  })
+
+  // Punguza deni la supplier
+  const supplier = await db.suppliers.get(data.supplier_local_id)
+  if (supplier) {
+    const newBalance = Number(supplier.balance || 0) - Number(data.amount)
+    await db.suppliers.update(data.supplier_local_id, {
+      balance: newBalance < 0 ? 0 : newBalance,
+    })
+  }
+
+  if (isOnline()) {
+    try {
+      await syncAll()
+    } catch (e) {
+      console.log('Sync failed:', e.message)
+    }
+  }
+
+  return await db.supplier_payments.get(local_id)
+}
+
+export async function getSupplierPayments(supplierLocalId) {
+  return await db.supplier_payments
+    .where('supplier_local_id').equals(supplierLocalId)
+    .reverse()
+    .sortBy('payment_date')
+}
+
+export async function getSupplierStats() {
+  const suppliers = await db.suppliers.toArray()
+  const totalDebt = suppliers.reduce((sum, s) => sum + Number(s.balance || 0), 0)
+  const withDebt = suppliers.filter(s => Number(s.balance) > 0).length
+
+  return {
+    total: suppliers.length,
+    withDebt,
+    totalDebt,
+  }
+}

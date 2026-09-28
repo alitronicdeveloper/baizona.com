@@ -8,6 +8,7 @@ const menuSections = [
       { to: '/wateja', label: 'Wateja', desc: 'Wateja wako', icon: 'users' },
       { to: '/madeni', label: 'Madeni', desc: 'Wanaodaiwa', icon: 'credit' },
       { to: '/amana', label: 'Amana', desc: 'Pesa za wateja dukani', icon: 'money' },
+      { to: '/suppliers', label: 'Wasambazaji', desc: 'Wanaokuuzia bidhaa', icon: 'box' },
       { to: '/expenses', label: 'Gharama', desc: 'Kodi, umeme, mishahara', icon: 'money' },
     ],
   },

@@ -13,6 +13,8 @@ import Zaidi from './pages/Zaidi'
 import Settings from './pages/Settings'
 import Expenses from './pages/Expenses'
 import Amana from './pages/Amana'
+import Suppliers from './pages/Suppliers'
+import SupplierDetail from './pages/SupplierDetail'
 import Profile from './pages/Profile'
 
 function App() {
@@ -33,6 +35,8 @@ function App() {
           <Route path="/settings" element={<Settings />} />
           <Route path="/expenses" element={<Expenses />} />
           <Route path="/amana" element={<Amana />} />
+          <Route path="/suppliers" element={<Suppliers />} />
+          <Route path="/suppliers/:id" element={<SupplierDetail />} />
           <Route path="/profile" element={<Profile />} />
         </Route>
       </Routes>

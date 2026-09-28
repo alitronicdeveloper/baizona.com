@@ -10,6 +10,7 @@ const menuItems = [
   { to: '/wateja', label: 'Wateja', icon: '👥' },
   { to: '/madeni', label: 'Madeni', icon: '💸' },
   { to: '/mauzo', label: 'Mauzo', icon: '📊' },
+  { to: '/zaidi', label: 'Menu', icon: '☰' },
 ]
 
 // Bottom nav ya simu — tabs 4

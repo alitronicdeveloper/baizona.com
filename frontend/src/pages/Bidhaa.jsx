@@ -90,10 +90,24 @@ function Bidhaa() {
   const [sortBy, setSortBy] = useState('name')
   const rowRefs = useRef([])
 
+  // Stock Form
+  const [suppliers, setSuppliers] = useState([])
+  const [showStockForm, setShowStockForm] = useState(false)
+  const [stockProduct, setStockProduct] = useState(null)
+  const [stockForm, setStockForm] = useState({
+    supplier_local_id: '',
+    quantity: '',
+    cost_price: '',
+    amount_paid: '',
+    notes: '',
+  })
+
   const load = async () => {
     setLoading(true)
     const data = await getAllProducts()
     setProducts(data)
+    const sups = await getAllSuppliers()
+    setSuppliers(sups)
     setLoading(false)
   }
 
@@ -125,6 +139,64 @@ function Bidhaa() {
     setRows([])
     setCustomItem('')
     setShowCustomInput(false)
+  }
+
+  const openStockForm = (product) => {
+    setStockProduct(product)
+    setStockForm({
+      supplier_local_id: '',
+      quantity: '',
+      cost_price: product.cost_price || '',
+      amount_paid: '',
+      notes: '',
+    })
+    setShowStockForm(true)
+  }
+
+  const closeStockForm = () => {
+    setShowStockForm(false)
+    setStockProduct(null)
+    setStockForm({
+      supplier_local_id: '',
+      quantity: '',
+      cost_price: '',
+      amount_paid: '',
+      notes: '',
+    })
+  }
+
+  const handleStockSubmit = async (e) => {
+    e.preventDefault()
+
+    if (!stockForm.quantity || Number(stockForm.quantity) <= 0) {
+      alert('Weka kiasi sahihi')
+      return
+    }
+
+    if (!stockForm.cost_price || Number(stockForm.cost_price) <= 0) {
+      alert('Weka bei ya kununua')
+      return
+    }
+
+    try {
+      await createPurchaseLocal({
+        supplier_local_id: stockForm.supplier_local_id || null,
+        items: [{
+          product_local_id: stockProduct.local_id,
+          product_name: stockProduct.name,
+          quantity: Number(stockForm.quantity),
+          cost_price: Number(stockForm.cost_price),
+        }],
+        amount_paid: Number(stockForm.amount_paid || 0),
+        notes: stockForm.notes,
+      })
+
+      alert(`✅ Stock imeongezwa kwa ${stockProduct.name}!`)
+      closeStockForm()
+      load()
+    } catch (err) {
+      alert('Kosa: ' + err.message)
+    }
   }
 
   const closeForm = () => {
@@ -340,6 +412,13 @@ function Bidhaa() {
                           {p.stock} {p.unit}
                         </div>
                       </div>
+                      <button
+                        className="stock-btn"
+                        onClick={() => openStockForm(p)}
+                        title="Ongeza Stock"
+                      >
+                        +
+                      </button>
                     </div>
                   )
                 })}
@@ -524,6 +603,116 @@ function Bidhaa() {
           </>
         )}
       </div>
+
+      {/* STOCK FORM MODAL */}
+      {showStockForm && stockProduct && (
+        <div className="modal-overlay" onClick={closeStockForm}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <h2 className="modal-title">Ongeza Stock</h2>
+                <div style={{ fontSize: '13px', color: '#9CA3AF', marginTop: '2px' }}>
+                  {stockProduct.name}
+                </div>
+              </div>
+              <button className="modal-close" onClick={closeStockForm}>✕</button>
+            </div>
+
+            <form onSubmit={handleStockSubmit} className="modal-body">
+              <div className="stock-current">
+                Stock ya sasa: <strong>{stockProduct.stock} {stockProduct.unit}</strong>
+              </div>
+
+              <label className="form-label">Supplier (si lazima)</label>
+              <select
+                value={stockForm.supplier_local_id}
+                onChange={e => setStockForm({ ...stockForm, supplier_local_id: e.target.value })}
+                className="form-input"
+              >
+                <option value="">-- Bila Supplier --</option>
+                {suppliers.map(s => (
+                  <option key={s.local_id} value={s.local_id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+
+              <label className="form-label">Kiasi *</label>
+              <input
+                type="number"
+                placeholder="0"
+                value={stockForm.quantity}
+                onChange={e => setStockForm({ ...stockForm, quantity: e.target.value })}
+                className="form-input"
+                inputMode="numeric"
+                autoFocus
+                required
+              />
+
+              <label className="form-label">Bei ya Kununua (kwa kimoja) *</label>
+              <input
+                type="number"
+                placeholder="0"
+                value={stockForm.cost_price}
+                onChange={e => setStockForm({ ...stockForm, cost_price: e.target.value })}
+                className="form-input"
+                inputMode="numeric"
+                required
+              />
+
+              <label className="form-label">Malipo ya Awali</label>
+              <input
+                type="number"
+                placeholder="0 (kama umelipa)"
+                value={stockForm.amount_paid}
+                onChange={e => setStockForm({ ...stockForm, amount_paid: e.target.value })}
+                className="form-input"
+                inputMode="numeric"
+              />
+
+              <label className="form-label">Maelezo</label>
+              <input
+                type="text"
+                placeholder="Maelezo (si lazima)"
+                value={stockForm.notes}
+                onChange={e => setStockForm({ ...stockForm, notes: e.target.value })}
+                className="form-input"
+              />
+
+              {stockForm.quantity && stockForm.cost_price && (
+                <div className="calc-box">
+                  <div className="calc-row">
+                    <span>Jumla</span>
+                    <span className="calc-value">
+                      {formatTZS(Number(stockForm.quantity) * Number(stockForm.cost_price))}
+                    </span>
+                  </div>
+                  {stockForm.amount_paid && (
+                    <>
+                      <div className="calc-row">
+                        <span>Malipo</span>
+                        <span>{formatTZS(Number(stockForm.amount_paid))}</span>
+                      </div>
+                      <div className="calc-row calc-final">
+                        <span>Deni</span>
+                        <span className="calc-debt">
+                          {formatTZS(
+                            Number(stockForm.quantity) * Number(stockForm.cost_price) - Number(stockForm.amount_paid)
+                          )}
+                        </span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
+              <button type="submit" className="form-btn">
+                HIFADHI STOCK
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
 
       <style>{`
         .bidhaa {
@@ -1141,6 +1330,157 @@ function Bidhaa() {
         .form-btns .form-btn {
           flex: 2;
           margin-top: 0;
+        }
+
+        /* STOCK BUTTON */
+        .stock-btn {
+          position: absolute;
+          top: 12px;
+          right: 12px;
+          width: 32px;
+          height: 32px;
+          border-radius: 50%;
+          background: rgba(249, 115, 22, 0.15);
+          border: 1px solid rgba(249, 115, 22, 0.3);
+          color: #F97316;
+          font-size: 18px;
+          font-weight: 700;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.15s;
+          z-index: 2;
+        }
+
+        .stock-btn:active {
+          transform: scale(0.9);
+          background: #F97316;
+          color: #fff;
+        }
+
+        .card {
+          position: relative;
+        }
+
+        /* MODAL */
+        .modal-overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.7);
+          backdrop-filter: blur(6px);
+          z-index: 200;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 20px;
+          animation: fadeIn 0.2s ease-out;
+        }
+
+        .modal-content {
+          background: #1A1A1A;
+          border-radius: 20px;
+          width: 100%;
+          max-width: 420px;
+          max-height: 90vh;
+          overflow-y: auto;
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+          animation: popIn 0.25s ease-out;
+        }
+
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+
+        @keyframes popIn {
+          from { opacity: 0; transform: scale(0.96); }
+          to { opacity: 1; transform: scale(1); }
+        }
+
+        .modal-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          padding: 20px 20px 16px;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .modal-title {
+          font-size: 18px;
+          font-weight: 700;
+          color: #fff;
+        }
+
+        .modal-close {
+          background: rgba(255, 255, 255, 0.08);
+          border: none;
+          width: 32px;
+          height: 32px;
+          border-radius: 10px;
+          color: #9CA3AF;
+          font-size: 14px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .modal-body {
+          padding: 20px;
+        }
+
+        .stock-current {
+          background: rgba(249, 115, 22, 0.1);
+          border: 1px solid rgba(249, 115, 22, 0.2);
+          border-radius: 10px;
+          padding: 10px 14px;
+          font-size: 13px;
+          color: #FED7AA;
+          margin-bottom: 16px;
+        }
+
+        .stock-current strong {
+          color: #F97316;
+        }
+
+        .calc-box {
+          background: #0A0A0A;
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          border-radius: 12px;
+          padding: 12px 14px;
+          margin-top: 12px;
+        }
+
+        .calc-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          font-size: 12px;
+          padding: 4px 0;
+        }
+
+        .calc-row span:first-child {
+          color: #9CA3AF;
+        }
+
+        .calc-value {
+          font-weight: 800;
+          color: #F97316;
+          font-size: 14px;
+        }
+
+        .calc-final {
+          border-top: 1px dashed rgba(255, 255, 255, 0.08);
+          margin-top: 6px;
+          padding-top: 8px;
+        }
+
+        .calc-debt {
+          color: #EF4444;
+          font-weight: 800;
+          font-size: 14px;
         }
       `}</style>
     </div>
