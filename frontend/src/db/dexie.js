@@ -2,7 +2,7 @@ import Dexie from 'dexie'
 
 export const db = new Dexie('baizona_local')
 
-db.version(6).stores({
+db.version(8).stores({
   products: 'local_id, remote_id, name, category, unit, stock, synced_at',
   customers: 'local_id, remote_id, name, phone, balance, deposit, oldest_credit_date, last_credit_date, synced_at',
   sales: 'local_id, remote_id, customer_local_id, payment_method, sale_date, synced_at',
@@ -15,6 +15,9 @@ db.version(6).stores({
   purchases: 'local_id, remote_id, supplier_local_id, purchase_date, synced_at',
   purchase_items: 'local_id, remote_id, purchase_id, product_local_id, synced_at',
   supplier_payments: 'local_id, remote_id, supplier_local_id, payment_date, synced_at',
+  returns: 'local_id, remote_id, sale_id, customer_local_id, refund_method, return_date, synced_at',
+  return_items: 'local_id, remote_id, return_id, product_local_id, synced_at',
+  supplier_products: 'local_id, remote_id, supplier_local_id, product_local_id, synced_at',
 })
 
 export function generateLocalId() {

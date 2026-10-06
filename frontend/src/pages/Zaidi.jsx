@@ -10,6 +10,7 @@ const menuSections = [
       { to: '/amana', label: 'Amana', desc: 'Pesa za wateja dukani', icon: 'money' },
       { to: '/suppliers', label: 'Wasambazaji', desc: 'Wanaokuuzia bidhaa', icon: 'box' },
       { to: '/expenses', label: 'Gharama', desc: 'Kodi, umeme, mishahara', icon: 'money' },
+      { to: '/returns', label: 'Returns', desc: 'Kurudisha bidhaa', icon: 'credit' },
     ],
   },
   {

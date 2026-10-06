@@ -267,6 +267,41 @@ export async function createSaleLocal(data) {
     }
   }
 
+  // Kama malipo ni kwa amana — punguza amana ya mteja
+  if (data.payment_method === 'deposit' && data.customer_local_id) {
+    const customer = await db.customers.get(data.customer_local_id)
+    if (customer) {
+      const currentDeposit = Number(customer.deposit || 0)
+      const saleTotal = Number(data.total_amount)
+      let newDeposit = currentDeposit - saleTotal
+      let newBalance = Number(customer.balance || 0)
+
+      if (newDeposit < 0) {
+        // Amana haitoshi — inabaki kama deni
+        newBalance += Math.abs(newDeposit)
+        newDeposit = 0
+      }
+
+      await db.customers.update(data.customer_local_id, {
+        deposit: newDeposit,
+        balance: newBalance,
+      })
+
+      // Rekodi deposit transaction
+      await db.deposits.add({
+        local_id: generateLocalId(),
+        remote_id: null,
+        customer_local_id: data.customer_local_id,
+        amount: saleTotal,
+        deposit_type: 'out',
+        notes: 'Malipo ya mauzo kwa amana',
+        deposit_date: new Date().toISOString(),
+        synced_at: null,
+        created_at: new Date().toISOString(),
+      })
+    }
+  }
+
   if (isOnline()) {
     await syncAll()
   }
@@ -633,10 +668,19 @@ export async function getAllPurchases() {
 }
 
 export async function getPurchasesBySupplier(supplierLocalId) {
-  return await db.purchases
+  const purchases = await db.purchases
     .where('supplier_local_id').equals(supplierLocalId)
     .reverse()
     .sortBy('purchase_date')
+
+  for (const p of purchases) {
+    const items = await db.purchase_items
+      .where('purchase_id').equals(p.local_id)
+      .toArray()
+    p.items = items
+  }
+
+  return purchases
 }
 
 export async function createPurchaseLocal(data) {
@@ -788,4 +832,178 @@ export async function getSupplierStats() {
     withDebt,
     totalDebt,
   }
+}
+
+
+// =====================================================
+// SUPPLIER PRODUCTS (Bidhaa za Supplier)
+// =====================================================
+
+export async function getSupplierProducts(supplierLocalId) {
+  return await db.supplier_products
+    .where('supplier_local_id').equals(supplierLocalId)
+    .toArray()
+}
+
+export async function addSupplierProduct(data) {
+  // data: { supplier_local_id, product_local_id, supplier_price }
+  const existing = await db.supplier_products
+    .filter(sp => sp.supplier_local_id === data.supplier_local_id && sp.product_local_id === data.product_local_id)
+    .first()
+
+  if (existing) {
+    await db.supplier_products.update(existing.local_id, {
+      supplier_price: Number(data.supplier_price),
+      synced_at: null,
+    })
+    return await db.supplier_products.get(existing.local_id)
+  }
+
+  const local_id = generateLocalId()
+  await db.supplier_products.add({
+    local_id,
+    remote_id: null,
+    supplier_local_id: data.supplier_local_id,
+    product_local_id: data.product_local_id,
+    supplier_price: Number(data.supplier_price),
+    synced_at: null,
+    created_at: new Date().toISOString(),
+  })
+
+  if (isOnline()) {
+    try {
+      await syncAll()
+    } catch (e) {
+      console.log('Sync failed:', e.message)
+    }
+  }
+
+  return await db.supplier_products.get(local_id)
+}
+
+export async function removeSupplierProduct(supplierLocalId, productLocalId) {
+  const existing = await db.supplier_products
+    .filter(sp => sp.supplier_local_id === supplierLocalId && sp.product_local_id === productLocalId)
+    .first()
+
+  if (existing) {
+    await db.supplier_products.delete(existing.local_id)
+  }
+}
+
+
+// =====================================================
+// RETURNS (Kurudisha Bidhaa)
+// =====================================================
+
+export async function getAllReturns() {
+  return await db.returns.orderBy('return_date').reverse().toArray()
+}
+
+export async function getReturnsBySale(saleLocalId) {
+  return await db.returns
+    .where('sale_id').equals(saleLocalId)
+    .reverse()
+    .sortBy('return_date')
+}
+
+export async function createReturnLocal(data) {
+  const returnLocalId = generateLocalId()
+  let totalAmount = 0
+
+  await db.returns.add({
+    local_id: returnLocalId,
+    remote_id: null,
+    sale_id: data.sale_local_id || null,
+    customer_local_id: data.customer_local_id || null,
+    total_amount: 0,
+    refund_method: data.refund_method,
+    reason: data.reason || '',
+    return_date: new Date().toISOString(),
+    synced_at: null,
+    created_at: new Date().toISOString(),
+  })
+
+  for (const item of data.items) {
+    const subtotal = Number(item.unit_price) * Number(item.quantity)
+    totalAmount += subtotal
+
+    await db.return_items.add({
+      local_id: generateLocalId(),
+      remote_id: null,
+      return_id: returnLocalId,
+      product_local_id: item.product_local_id,
+      product_name: item.product_name,
+      quantity: Number(item.quantity),
+      unit_price: Number(item.unit_price),
+      cost_price: Number(item.cost_price || 0),
+      subtotal: subtotal,
+      synced_at: null,
+    })
+
+    const product = await db.products.get(item.product_local_id)
+    if (product) {
+      await db.products.update(item.product_local_id, {
+        stock: Number(product.stock) + Number(item.quantity),
+      })
+
+      await db.stock_movements.add({
+        local_id: generateLocalId(),
+        remote_id: null,
+        product_local_id: item.product_local_id,
+        product_name: item.product_name,
+        movement_type: 'in',
+        quantity: Number(item.quantity),
+        reference_type: 'return',
+        reference_id: returnLocalId,
+        notes: `Return: ${data.reason || 'Bila sababu'}`,
+        created_at: new Date().toISOString(),
+        synced_at: null,
+      })
+    }
+  }
+
+  await db.returns.update(returnLocalId, {
+    total_amount: totalAmount,
+  })
+
+  if (data.refund_method === 'credit' && data.customer_local_id) {
+    const customer = await db.customers.get(data.customer_local_id)
+    if (customer) {
+      const newBalance = Number(customer.balance) - totalAmount
+      await db.customers.update(data.customer_local_id, {
+        balance: newBalance < 0 ? 0 : newBalance,
+      })
+    }
+  }
+
+  if (isOnline()) {
+    try {
+      await syncAll()
+    } catch (e) {
+      console.log('Sync failed:', e.message)
+    }
+  }
+
+  return await db.returns.get(returnLocalId)
+}
+
+export async function getReturnsStats() {
+  const now = new Date()
+  const today = now.toISOString().split('T')[0]
+  const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString()
+
+  const all = await db.returns.toArray()
+
+  const todayTotal = all
+    .filter(r => r.return_date?.startsWith(today))
+    .reduce((sum, r) => sum + Number(r.total_amount || 0), 0)
+
+  const monthTotal = all
+    .filter(r => r.return_date >= monthAgo)
+    .reduce((sum, r) => sum + Number(r.total_amount || 0), 0)
+
+  const allTotal = all.reduce((sum, r) => sum + Number(r.total_amount || 0), 0)
+
+  return { todayTotal, monthTotal, allTotal, count: all.length }
 }

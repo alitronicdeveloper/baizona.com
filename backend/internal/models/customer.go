@@ -11,6 +11,7 @@ type Customer struct {
 	Name      string     `json:"name"`
 	Phone     string     `json:"phone"`
 	Balance   float64    `json:"balance"`
+	Deposit   float64    `json:"deposit"`
 	CreatedAt time.Time  `json:"created_at"`
 	UpdatedAt time.Time  `json:"updated_at"`
 	SyncedAt  *time.Time `json:"synced_at,omitempty"`

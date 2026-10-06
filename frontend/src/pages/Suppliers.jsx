@@ -19,6 +19,8 @@ function Suppliers() {
     name: '',
     phone: '',
     address: '',
+    region: '',
+    district: '',
     notes: '',
   })
 
@@ -51,7 +53,7 @@ function Suppliers() {
 
     try {
       await createSupplierLocal(form)
-      setForm({ name: '', phone: '', address: '', notes: '' })
+      setForm({ name: '', phone: '', address: '', region: '', district: '', notes: '' })
       setShowForm(false)
       load()
     } catch (err) {
@@ -82,19 +84,29 @@ function Suppliers() {
 
         <div className="hero-stats">
           <div className="hero-stat">
-            <div className="hero-stat-label">WANAOTUDAI</div>
-            <div className="hero-stat-count">{stats.oweCount}</div>
-            <div className="hero-stat-amount danger">
-              {formatTZS(stats.oweTotal)}
-            </div>
+            <div className="hero-stat-value">{stats.total}</div>
+            <div className="hero-stat-label">WASAMBAZAJI</div>
           </div>
           <div className="hero-stat-divider"></div>
           <div className="hero-stat">
+            <div className="hero-stat-value hero-stat-danger">{stats.oweCount}</div>
+            <div className="hero-stat-label">WANAOTUDAI</div>
+          </div>
+          <div className="hero-stat-divider"></div>
+          <div className="hero-stat">
+            <div className="hero-stat-value hero-stat-success">{stats.owedCount}</div>
             <div className="hero-stat-label">TUNAOWADAI</div>
-            <div className="hero-stat-count">{stats.owedCount}</div>
-            <div className="hero-stat-amount success">
-              {formatTZS(stats.owedTotal)}
-            </div>
+          </div>
+        </div>
+
+        <div className="hero-totals">
+          <div className="hero-total-item">
+            <span className="hero-total-label">JUMLA TUNAYOWADAI</span>
+            <span className="hero-total-value danger">{formatTZS(stats.oweTotal)}</span>
+          </div>
+          <div className="hero-total-item">
+            <span className="hero-total-label">JUMLA WANAYOTUDAI</span>
+            <span className="hero-total-value success">{formatTZS(stats.owedTotal)}</span>
           </div>
         </div>
       </div>
@@ -131,11 +143,34 @@ function Suppliers() {
             <label className="form-label">Anwani</label>
             <input
               type="text"
-              placeholder="Mfano: Kariakoo, Dar"
+              placeholder="Mfano: Kariakoo"
               value={form.address}
               onChange={e => setForm({ ...form, address: e.target.value })}
               className="form-input"
             />
+
+            <div className="form-row">
+              <div>
+                <label className="form-label">Mkoa</label>
+                <input
+                  type="text"
+                  placeholder="Mfano: Dar es Salaam"
+                  value={form.region}
+                  onChange={e => setForm({ ...form, region: e.target.value })}
+                  className="form-input"
+                />
+              </div>
+              <div>
+                <label className="form-label">Wilaya</label>
+                <input
+                  type="text"
+                  placeholder="Mfano: Ilala"
+                  value={form.district}
+                  onChange={e => setForm({ ...form, district: e.target.value })}
+                  className="form-input"
+                />
+              </div>
+            </div>
 
             <label className="form-label">Maelezo</label>
             <input
@@ -388,6 +423,8 @@ function Suppliers() {
           margin-bottom: 14px;
         }
 
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .form-row .form-input { margin-bottom: 0; }
         .form-label {
           display: block;
           font-size: 11px;

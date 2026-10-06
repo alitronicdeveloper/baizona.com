@@ -10,7 +10,25 @@ const menuItems = [
   { to: '/wateja', label: 'Wateja', icon: '👥' },
   { to: '/madeni', label: 'Madeni', icon: '💸' },
   { to: '/mauzo', label: 'Mauzo', icon: '📊' },
-  { to: '/zaidi', label: 'Menu', icon: '☰' },
+]
+
+const zaidiSections = [
+  {
+    title: 'BIASHARA',
+    items: [
+      { to: '/amana', label: 'Amana', icon: '💰' },
+      { to: '/suppliers', label: 'Wasambazaji', icon: '🏭' },
+      { to: '/expenses', label: 'Gharama', icon: '💵' },
+      { to: '/returns', label: 'Returns', icon: '↩️' },
+    ],
+  },
+  {
+    title: 'AKAUNTI',
+    items: [
+      { to: '/settings', label: 'Mipangilio', icon: '⚙️' },
+      { to: '/profile', label: 'Profile', icon: '👤' },
+    ],
+  },
 ]
 
 // Bottom nav ya simu — tabs 4
@@ -94,6 +112,7 @@ function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
+  const [zaidiOpen, setZaidiOpen] = useState(false)
   const location = useLocation()
 
   const currentPage = menuItems.find(m =>
@@ -129,7 +148,7 @@ function Layout() {
               key={item.to}
               to={item.to}
               end={item.end}
-              onClick={() => setSidebarOpen(false)}
+              onClick={() => { setSidebarOpen(false); setZaidiOpen(false) }}
               className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
             >
               <span className="sidebar-icon">{item.icon}</span>
@@ -137,6 +156,43 @@ function Layout() {
               <span className="sidebar-indicator" />
             </NavLink>
           ))}
+
+          {/* ZAIDI — dropdown */}
+          <div
+            className="sidebar-zaidi-wrap"
+            onMouseEnter={() => setZaidiOpen(true)}
+            onMouseLeave={() => setZaidiOpen(false)}
+          >
+            <button
+              className={`sidebar-link sidebar-zaidi-btn ${zaidiOpen ? 'active' : ''}`}
+              onClick={() => setZaidiOpen(!zaidiOpen)}
+            >
+              <span className="sidebar-icon">☰</span>
+              <span className="sidebar-label">Zaidi</span>
+              <span className={`sidebar-arrow ${zaidiOpen ? 'open' : ''}`}>▸</span>
+            </button>
+
+            {zaidiOpen && (
+              <div className="sidebar-dropdown">
+                {zaidiSections.map(section => (
+                  <div key={section.title} className="sidebar-dropdown-section">
+                    <div className="sidebar-dropdown-title">{section.title}</div>
+                    {section.items.map(item => (
+                      <NavLink
+                        key={item.to}
+                        to={item.to}
+                        onClick={() => { setSidebarOpen(false); setZaidiOpen(false) }}
+                        className={({ isActive }) => `sidebar-dropdown-link ${isActive ? 'active' : ''}`}
+                      >
+                        <span className="sidebar-dropdown-icon">{item.icon}</span>
+                        <span>{item.label}</span>
+                      </NavLink>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </nav>
 
         <div className="sidebar-footer">
@@ -288,8 +344,8 @@ function Layout() {
         /* ===================== SIDEBAR (PC) ===================== */
         .sidebar {
           width: 256px;
-          background: #fff;
-          border-right: 1px solid var(--gray-200);
+          background: #0F0F0F;
+          border-right: 1px solid rgba(255, 255, 255, 0.06);
           padding: 20px 16px;
           position: fixed;
           top: 0; bottom: 0; left: 0;
@@ -304,26 +360,27 @@ function Layout() {
           align-items: center;
           gap: 12px;
           padding: 8px 8px 24px;
-          border-bottom: 1px solid var(--gray-100);
+          border-bottom: 1px solid rgba(255, 255, 255, 0.06);
           margin-bottom: 16px;
         }
 
         .logo-box {
           width: 40px; height: 40px;
-          border-radius: 10px;
-          background: var(--primary);
+          border-radius: 12px;
+          background: linear-gradient(135deg, #F97316, #EA580C);
           display: flex; align-items: center; justify-content: center;
           color: #fff; font-size: 18px; font-weight: 800;
           flex-shrink: 0;
+          box-shadow: 0 4px 12px rgba(249, 115, 22, 0.35);
         }
 
         .logo-text {
           font-weight: 700; font-size: 16px;
-          color: var(--gray-900); letter-spacing: -0.3px;
+          color: #fff; letter-spacing: -0.3px;
         }
 
         .logo-sub {
-          font-size: 11px; color: var(--gray-500); margin-top: 1px;
+          font-size: 11px; color: #71717a; margin-top: 1px;
         }
 
         .sidebar-nav {
@@ -337,25 +394,31 @@ function Layout() {
         .sidebar-link {
           display: flex; align-items: center; gap: 12px;
           padding: 11px 14px; border-radius: 10px;
-          text-decoration: none; color: var(--gray-600);
+          text-decoration: none; color: #9CA3AF;
           font-weight: 500; font-size: 14px;
-          transition: var(--transition);
+          transition: all 0.15s;
           position: relative;
+          background: transparent;
+          border: none;
+          width: 100%;
+          cursor: pointer;
+          font-family: inherit;
+          text-align: left;
         }
 
         .sidebar-link:hover {
-          background: var(--gray-50);
-          color: var(--gray-900);
+          background: rgba(255, 255, 255, 0.04);
+          color: #fff;
         }
 
         .sidebar-link.active {
-          background: var(--border-light);
-          color: var(--text);
-          font-weight: 600;
+          background: rgba(249, 115, 22, 0.12);
+          color: #F97316;
+          font-weight: 700;
         }
 
         .sidebar-link.active .sidebar-icon {
-          color: var(--accent);
+          color: #F97316;
         }
 
         .sidebar-icon {
@@ -367,21 +430,104 @@ function Layout() {
 
         .sidebar-indicator {
           width: 6px; height: 6px; border-radius: 50%;
-          background: var(--accent); opacity: 0;
-          transition: var(--transition);
+          background: #F97316; opacity: 0;
+          transition: all 0.15s;
         }
 
         .sidebar-link.active .sidebar-indicator {
           opacity: 1;
         }
 
+        /* ZAIDI */
+        .sidebar-zaidi-wrap {
+          position: relative;
+          margin-top: 4px;
+        }
+
+        .sidebar-arrow {
+          font-size: 12px;
+          color: #71717a;
+          transition: transform 0.2s;
+        }
+
+        .sidebar-arrow.open {
+          transform: rotate(90deg);
+        }
+
+        .sidebar-dropdown {
+          position: relative;
+          width: 100%;
+          margin-top: 6px;
+          background: #141414;
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          border-radius: 14px;
+          padding: 10px;
+          box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6);
+          z-index: 100;
+          animation: dropdownSlide 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes dropdownSlide {
+          from { opacity: 0; transform: translateX(-8px); }
+          to { opacity: 1; transform: translateX(0); }
+        }
+
+        .sidebar-dropdown-section {
+          margin-bottom: 8px;
+        }
+
+        .sidebar-dropdown-section:last-child {
+          margin-bottom: 0;
+        }
+
+        .sidebar-dropdown-title {
+          font-size: 9px;
+          font-weight: 800;
+          color: #52525b;
+          text-transform: uppercase;
+          letter-spacing: 1px;
+          padding: 6px 10px 4px;
+        }
+
+        .sidebar-dropdown-link {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 9px 10px;
+          border-radius: 9px;
+          text-decoration: none;
+          color: #D1D5DB;
+          font-size: 13px;
+          font-weight: 500;
+          transition: all 0.12s;
+        }
+
+        .sidebar-dropdown-link:hover {
+          background: rgba(255, 255, 255, 0.05);
+          color: #fff;
+        }
+
+        .sidebar-dropdown-link.active {
+          background: rgba(249, 115, 22, 0.12);
+          color: #F97316;
+          font-weight: 700;
+        }
+
+        .sidebar-dropdown-icon {
+          font-size: 15px;
+          width: 20px;
+          text-align: center;
+          flex-shrink: 0;
+        }
+
         .sidebar-footer {
           padding-top: 16px;
-          border-top: 1px solid var(--gray-100);
+          border-top: 1px solid rgba(255, 255, 255, 0.06);
         }
 
         .footer-card {
-          background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
+          background: rgba(255, 255, 255, 0.03);
+          border: 1px solid rgba(255, 255, 255, 0.05);
           border-radius: 12px; padding: 14px; text-align: center;
         }
 

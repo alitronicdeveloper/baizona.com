@@ -24,15 +24,26 @@ func (h *CustomerHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	shopID := r.URL.Query().Get("shop_id")
+
 	customer := &models.Customer{
 		ID:      uuid.New(),
 		Name:    req.Name,
 		Phone:   req.Phone,
 		Balance: 0,
+		Deposit: 0,
 	}
 
-	err := h.DB.QueryRow(`INSERT INTO customers (id, name, phone, balance) VALUES ($1, $2, $3, $4) RETURNING created_at, updated_at`,
-		customer.ID, customer.Name, customer.Phone, customer.Balance).Scan(&customer.CreatedAt, &customer.UpdatedAt)
+	var shopUUID *uuid.UUID
+	if shopID != "" {
+		parsed, err := uuid.Parse(shopID)
+		if err == nil {
+			shopUUID = &parsed
+		}
+	}
+
+	err := h.DB.QueryRow(`INSERT INTO customers (id, name, phone, balance, deposit, shop_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING created_at, updated_at`,
+		customer.ID, customer.Name, customer.Phone, customer.Balance, customer.Deposit, shopUUID).Scan(&customer.CreatedAt, &customer.UpdatedAt)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -44,7 +55,20 @@ func (h *CustomerHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *CustomerHandler) GetAll(w http.ResponseWriter, r *http.Request) {
-	rows, err := h.DB.Query(`SELECT id, name, phone, balance, created_at, updated_at FROM customers WHERE deleted_at IS NULL ORDER BY name ASC`)
+	shopID := r.URL.Query().Get("shop_id")
+
+	query := `SELECT id, name, phone, COALESCE(balance, 0), COALESCE(deposit, 0), created_at, updated_at
+	          FROM customers WHERE deleted_at IS NULL`
+	args := []interface{}{}
+
+	if shopID != "" {
+		query += ` AND shop_id = $1`
+		args = append(args, shopID)
+	}
+
+	query += ` ORDER BY name ASC`
+
+	rows, err := h.DB.Query(query, args...)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -54,7 +78,7 @@ func (h *CustomerHandler) GetAll(w http.ResponseWriter, r *http.Request) {
 	var customers []models.Customer
 	for rows.Next() {
 		var c models.Customer
-		err := rows.Scan(&c.ID, &c.Name, &c.Phone, &c.Balance, &c.CreatedAt, &c.UpdatedAt)
+		err := rows.Scan(&c.ID, &c.Name, &c.Phone, &c.Balance, &c.Deposit, &c.CreatedAt, &c.UpdatedAt)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return

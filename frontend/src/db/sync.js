@@ -137,7 +137,14 @@ export async function syncAll() {
   try {
     await syncProducts()
     await syncCustomers()
+    await syncSuppliers()
+    await syncSupplierPayments()
+    await syncSupplierProducts()
     await syncSales()
+    await syncReturns()
+    await syncExpenses()
+    await syncDeposits()
+    await syncPurchases()
     await syncPayments()
 
     const remaining = await countUnsynced()
@@ -157,4 +164,255 @@ export function startAutoSync() {
       await syncAll()
     }
   }, 30000)
+}
+
+
+// =====================================================
+// SUPPLIERS
+// =====================================================
+async function syncSuppliers() {
+  const unsynced = await db.suppliers.filter(s => !s.synced_at).toArray()
+
+  for (const supplier of unsynced) {
+    try {
+      const result = await api.post('/suppliers', {
+        name: supplier.name,
+        phone: supplier.phone || '',
+        address: supplier.address || '',
+        notes: supplier.notes || '',
+      })
+
+      await db.suppliers.update(supplier.local_id, {
+        remote_id: result.data.id,
+        synced_at: new Date().toISOString(),
+      })
+    } catch (err) {
+      console.error('Sync supplier error:', err)
+    }
+  }
+}
+
+
+// =====================================================
+// SUPPLIER PRODUCTS
+// =====================================================
+async function syncSupplierProducts() {
+  const unsynced = await db.supplier_products.filter(sp => !sp.synced_at).toArray()
+
+  for (const sp of unsynced) {
+    try {
+      const supplier = await db.suppliers.get(sp.supplier_local_id)
+      if (!supplier?.remote_id) continue
+
+      const product = await db.products.get(sp.product_local_id)
+      if (!product?.remote_id) continue
+
+      const result = await api.post(`/suppliers/${supplier.remote_id}/products`, {
+        product_id: product.remote_id,
+        supplier_price: sp.supplier_price,
+      })
+
+      await db.supplier_products.update(sp.local_id, {
+        remote_id: result.data.id,
+        synced_at: new Date().toISOString(),
+      })
+    } catch (err) {
+      console.error('Sync supplier product error:', err)
+    }
+  }
+}
+
+
+// =====================================================
+// PURCHASES
+// =====================================================
+async function syncPurchases() {
+  const unsynced = await db.purchases.filter(p => !p.synced_at).toArray()
+
+  for (const purchase of unsynced) {
+    try {
+      const items = await db.purchase_items.where('purchase_id').equals(purchase.local_id).toArray()
+
+      let supplierRemoteId = null
+      if (purchase.supplier_local_id) {
+        const supplier = await db.suppliers.get(purchase.supplier_local_id)
+        if (supplier?.remote_id) supplierRemoteId = supplier.remote_id
+      }
+
+      const itemsWithRemote = []
+      for (const item of items) {
+        const product = await db.products.get(item.product_local_id)
+        if (product?.remote_id) {
+          itemsWithRemote.push({
+            product_id: product.remote_id,
+            product_name: item.product_name,
+            quantity: item.quantity,
+            cost_price: item.cost_price,
+          })
+        }
+      }
+
+      if (itemsWithRemote.length === 0) continue
+
+      const payload = {
+        amount_paid: Number(purchase.amount_paid) || 0,
+        notes: purchase.notes || '',
+        items: itemsWithRemote,
+      }
+
+      if (supplierRemoteId) payload.supplier_id = supplierRemoteId
+
+      const result = await api.post('/purchases', payload)
+
+      await db.purchases.update(purchase.local_id, {
+        remote_id: result.data.id,
+        synced_at: new Date().toISOString(),
+      })
+    } catch (err) {
+      console.error('Sync purchase error:', err)
+    }
+  }
+}
+
+
+// =====================================================
+// SUPPLIER PAYMENTS
+// =====================================================
+async function syncSupplierPayments() {
+  const unsynced = await db.supplier_payments.filter(p => !p.synced_at).toArray()
+
+  for (const payment of unsynced) {
+    try {
+      const supplier = await db.suppliers.get(payment.supplier_local_id)
+      if (!supplier?.remote_id) continue
+
+      const result = await api.post('/supplier-payments', {
+        supplier_id: supplier.remote_id,
+        amount: Number(payment.amount),
+        payment_method: payment.payment_method,
+        notes: payment.notes || '',
+      })
+
+      await db.supplier_payments.update(payment.local_id, {
+        remote_id: result.data.id,
+        synced_at: new Date().toISOString(),
+      })
+    } catch (err) {
+      console.error('Sync supplier payment error:', err)
+    }
+  }
+}
+
+
+// =====================================================
+// RETURNS
+// =====================================================
+async function syncReturns() {
+  const unsynced = await db.returns.filter(r => !r.synced_at).toArray()
+
+  for (const ret of unsynced) {
+    try {
+      const items = await db.return_items.where('return_id').equals(ret.local_id).toArray()
+
+      let saleRemoteId = null
+      if (ret.sale_id) {
+        const sale = await db.sales.get(ret.sale_id)
+        if (sale?.remote_id) saleRemoteId = sale.remote_id
+      }
+
+      let customerRemoteId = null
+      if (ret.customer_local_id) {
+        const customer = await db.customers.get(ret.customer_local_id)
+        if (customer?.remote_id) customerRemoteId = customer.remote_id
+      }
+
+      const itemsWithRemote = []
+      for (const item of items) {
+        const product = await db.products.get(item.product_local_id)
+        if (product?.remote_id) {
+          itemsWithRemote.push({
+            product_id: product.remote_id,
+            product_name: item.product_name,
+            quantity: item.quantity,
+            unit_price: item.unit_price,
+            cost_price: item.cost_price || 0,
+          })
+        }
+      }
+
+      if (itemsWithRemote.length === 0) continue
+
+      const payload = {
+        refund_method: ret.refund_method,
+        reason: ret.reason || '',
+        items: itemsWithRemote,
+      }
+
+      if (saleRemoteId) payload.sale_id = saleRemoteId
+      if (customerRemoteId) payload.customer_id = customerRemoteId
+
+      const result = await api.post('/returns', payload)
+
+      await db.returns.update(ret.local_id, {
+        remote_id: result.data.id,
+        synced_at: new Date().toISOString(),
+      })
+    } catch (err) {
+      console.error('Sync return error:', err)
+    }
+  }
+}
+
+
+// =====================================================
+// EXPENSES
+// =====================================================
+async function syncExpenses() {
+  const unsynced = await db.expenses.filter(e => !e.synced_at).toArray()
+
+  for (const exp of unsynced) {
+    try {
+      const result = await api.post('/expenses', {
+        category: exp.category,
+        description: exp.description || '',
+        amount: Number(exp.amount),
+      })
+
+      await db.expenses.update(exp.local_id, {
+        remote_id: result.data.id,
+        synced_at: new Date().toISOString(),
+      })
+    } catch (err) {
+      console.error('Sync expense error:', err)
+    }
+  }
+}
+
+
+// =====================================================
+// DEPOSITS
+// =====================================================
+async function syncDeposits() {
+  const unsynced = await db.deposits.filter(d => !d.synced_at).toArray()
+
+  for (const dep of unsynced) {
+    try {
+      const customer = await db.customers.get(dep.customer_local_id)
+      if (!customer?.remote_id) continue
+
+      const result = await api.post('/deposits', {
+        customer_id: customer.remote_id,
+        amount: Number(dep.amount),
+        deposit_type: dep.deposit_type,
+        notes: dep.notes || '',
+      })
+
+      await db.deposits.update(dep.local_id, {
+        remote_id: result.data.id,
+        synced_at: new Date().toISOString(),
+      })
+    } catch (err) {
+      console.error('Sync deposit error:', err)
+    }
+  }
 }

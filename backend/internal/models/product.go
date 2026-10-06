@@ -20,6 +20,7 @@ type Product struct {
 	UpdatedAt    time.Time  `json:"updated_at"`
 	SyncedAt     *time.Time `json:"synced_at,omitempty"`
 	DeletedAt    *time.Time `json:"deleted_at,omitempty"`
+	ShopID       *uuid.UUID `json:"shop_id,omitempty"`
 }
 
 // CreateProductRequest - kwa ajili ya kupokea data kutoka frontend

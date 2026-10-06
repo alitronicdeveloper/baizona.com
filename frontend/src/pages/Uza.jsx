@@ -19,6 +19,7 @@ function Uza() {
   const [category, setCategory] = useState('all')
   const [payment, setPayment] = useState('cash')
   const [selectedCustomer, setSelectedCustomer] = useState(null)
+  const [customersWithDeposits, setCustomersWithDeposits] = useState([])
   const [showPicker, setShowPicker] = useState(false)
   const [showQuickAdd, setShowQuickAdd] = useState(false)
   const [showCart, setShowCart] = useState(false)
@@ -108,11 +109,14 @@ function Uza() {
     if (payment === 'credit' && !selectedCustomer) {
       return alert('Tafadhali chagua mteja kwa mauzo ya deni')
     }
+    if (payment === 'deposit' && !selectedCustomer) {
+      return alert('Tafadhali chagua mteja mwenye amana')
+    }
 
     try {
       const createdSale = await createSaleLocal({
-        payment_method: payment,
-        customer_local_id: payment === 'credit' ? selectedCustomer : null,
+        payment_method: payment === 'deposit' ? 'deposit' : payment,
+        customer_local_id: selectedCustomer || null,
         amount_paid: payment === 'credit' ? 0 : total,
         total_amount: total,
         profit: profit,
@@ -370,8 +374,9 @@ function Uza() {
               <div className="payments">
                 {[
                   { id: 'cash', label: 'Taslimu', icon: '💵' },
-                  { id: 'mpesa', label: 'M-Pesa', icon: '📱' },
+                  { id: 'mobile', label: 'Malipo kwa Simu', icon: '📱' },
                   { id: 'credit', label: 'Deni', icon: '📝' },
+                  { id: 'deposit', label: 'Amana', icon: '💰' },
                 ].map(m => (
                   <button
                     key={m.id}
@@ -384,8 +389,8 @@ function Uza() {
                 ))}
               </div>
 
-              {/* CUSTOMER (kwa credit pekee) */}
-              {payment === 'credit' && (
+              {/* CUSTOMER (kwa credit au deposit) */}
+              {(payment === 'credit' || payment === 'deposit') && (
                 <button
                   className="customer-btn"
                   onClick={() => setShowPicker(true)}
@@ -431,6 +436,7 @@ function Uza() {
           onSelect={setSelectedCustomer}
           onClose={() => setShowPicker(false)}
           onCreateNew={() => setShowQuickAdd(true)}
+          onlyDeposits={payment === 'deposit'}
         />
       )}
 

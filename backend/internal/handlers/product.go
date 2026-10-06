@@ -25,7 +25,10 @@ func (h *ProductHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	product, err := h.Service.CreateProduct(&req)
+	// Pata shop_id kutoka query
+	shopID := r.URL.Query().Get("shop_id")
+
+	product, err := h.Service.CreateProduct(&req, shopID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -37,7 +40,8 @@ func (h *ProductHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ProductHandler) GetAll(w http.ResponseWriter, r *http.Request) {
-	products, err := h.Service.GetAllProducts()
+	shopID := r.URL.Query().Get("shop_id")
+	products, err := h.Service.GetAllProducts(shopID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
