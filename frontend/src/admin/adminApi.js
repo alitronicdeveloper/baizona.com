@@ -1,7 +1,7 @@
 import axios from 'axios'
 
 const adminApi = axios.create({
-  baseURL: 'http://localhost:8081/api',
+  baseURL: 'https://baizona-backend.onrender.com/api',
   headers: { 'Content-Type': 'application/json' },
   timeout: 10000,
 })
